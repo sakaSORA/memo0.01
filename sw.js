@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kioku-v16'; // バージョンを更新
+const CACHE_NAME = 'kioku-v17'; // バージョンを更新して新しい設定を反映
 const urlsToCache = [
   './',
   './index.html',

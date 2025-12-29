@@ -1,6 +1,6 @@
 {
-  "name": "記憶の彼方 - Utility Edition",
-  "short_name": "記憶の彼方",
+  "name": "シンプル記憶",
+  "short_name": "シンプル記憶",
   "description": "実用性重視のカテゴリ別シンプルメモ帳",
   "start_url": "./index.html",
   "scope": "./",

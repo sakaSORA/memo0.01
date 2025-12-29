@@ -1,108 +1,9 @@
-    <style>
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        :root {
-            --primary-color: #A3D8FF; 
-            --tab-1: #FFE4E6; --tab-2: #FFF1E0; --tab-3: #FEFFD6;
-            --tab-4: #E6FFED; --tab-5: #E8F4FF; --tab-6: #F3E8FF;
-        }
-
-        html, body { height: 100%; margin: 0; padding: 0; width: 100%; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
-            background-color: #f5f5f5;
-            background-repeat: no-repeat; background-position: center; background-size: cover; background-attachment: fixed;
-            overflow-x: hidden; min-height: 100vh;
-        }
-
-        .fixed-top {
-            position: fixed; top: 0; left: 0; right: 0;
-            background: rgba(255, 255, 255, 0.98); 
-            z-index: 1000; border-bottom: 1px solid #ccc; width: 100%;
-        }
-        
-        .header-main { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; height: 48px; }
-        .app-title { font-size: 16px; font-weight: bold; color: #333; margin: 0; }
-        .header-icons { display: flex; gap: 8px; }
-        .icon-btn { 
-            background: #fff; border: 1px solid #ccc; border-radius: 6px; width: 38px; height: 38px;
-            display: flex; align-items: center; justify-content: center; font-size: 18px; color: #444; cursor: pointer;
-        }
-
-        .tab-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px 8px 8px; }
-        .tab {
-            padding: 12px 2px; border-radius: 6px; font-size: 0.85rem; border: 1px solid #ccc;
-            text-align: center; font-weight: bold; display: flex; align-items: center; justify-content: center; background: #fff;
-        }
-        .tab:nth-child(1) { background: var(--tab-1); }
-        .tab:nth-child(2) { background: var(--tab-2); }
-        .tab:nth-child(3) { background: var(--tab-3); }
-        .tab:nth-child(4) { background: var(--tab-4); }
-        .tab:nth-child(5) { background: var(--tab-5); }
-        .tab:nth-child(6) { background: var(--tab-6); }
-        .tab.active { border: 2px solid #333; filter: brightness(0.9); }
-
-        .search-container { padding: 0 8px 8px; }
-        #searchInput { width: 100%; padding: 10px 12px; border-radius: 6px; font-size: 15px; border: 1px solid #bbb; outline: none; background: #fff; }
-
-        #memoList { padding-bottom: 140px; width: 100%; }
-        
-        .memo-item {
-            display: flex; align-items: center; margin: 0; padding: 8px 10px;
-            border-bottom: 1px solid rgba(0,0,0,0.1); background: rgba(255, 255, 255, 0.9);
-            min-height: 54px; /* ボタン削減に合わせ少しだけ高さを最適化 */
-            width: 100%;
-        }
-        .memo-item:nth-child(even) { background: rgba(248, 248, 248, 0.9); }
-
-        .drag-handle { cursor: grab; color: #999; font-size: 20px; display: none; padding-right: 12px; }
-        .memo-item.sort-mode .drag-handle { display: block; }
-
-        .date-text { font-size: 0.7rem; color: #777; min-width: 75px; flex-shrink: 0; font-family: monospace; }
-        
-        .memo-body { 
-            flex: 1; font-size: 0.95rem; color: #111; margin: 0 10px;
-            white-space: pre-wrap; word-break: break-all;
-            display: -webkit-box;
-            -webkit-line-clamp: 2; /* 3行から2行へ変更 */
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        /* 編集時は全文表示 */
-        .memo-item.editing { flex-wrap: wrap; background: #fffde7 !important; padding: 15px; }
-        .memo-item.editing .memo-body { 
-            display: block; -webkit-line-clamp: unset; flex-basis: 100%; margin: 10px 0; padding: 12px;
-            background: #fff; border: 2px solid #007bff; border-radius: 6px; max-height: 350px; overflow-y: auto; outline: none;
-        }
-
-        .memo-controls { display: flex; gap: 6px; flex-shrink: 0; }
-        .action-btn { 
-            border: 1px solid #ccc; background: #fff; font-size: 0.8rem; font-weight: bold;
-            padding: 8px 12px; border-radius: 6px; color: #333;
-        }
-        /* 編集時のみ表示される削除ボタン用 */
-        .btn-delete { color: #d00; border-color: #faa; background: #fff0f0; display: none; }
-        .editing .btn-delete { display: block; }
-
-        .input-container {
-            position: fixed; bottom: 0; left: 0; right: 0;
-            background: #f8f8f8; padding: 12px; display: flex; gap: 10px; border-top: 1px solid #bbb; z-index: 1000;
-        }
-        #memoInput { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; resize: none; max-height: 150px; background: #fff; }
-        .add-btn { background: #007bff; color: white; border: none; padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px; }
-
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; }
-        .modal-content { background: white; width: 90%; max-width: 340px; border-radius: 12px; padding: 25px; text-align: center; }
-        .modal-btn { width: 100%; margin-bottom: 12px; padding: 14px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; background: white; font-weight: bold; }
-    </style>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>記憶の彼方 - Utility Edition</title>
+    <title>シンプル記憶</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -198,7 +99,6 @@
             margin: 0 10px;
             white-space: pre-wrap; 
             word-break: break-all;
-            /* 一覧性を高めるため、通常時は最大2行表示 */
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
@@ -216,7 +116,6 @@
             max-height: 350px; overflow-y: auto; outline: none;
         }
 
-        /* ボタン操作エリア */
         .memo-controls { display: flex; gap: 6px; flex-shrink: 0; }
         .action-btn { 
             border: 1px solid #ccc; background: #fff; 
@@ -224,11 +123,9 @@
             padding: 8px 12px; border-radius: 6px; color: #333;
         }
         
-        /* 削除ボタンは通常非表示、編集時のみ表示 */
         .btn-delete { color: #d00; border-color: #faa; background: #fff0f0; display: none; }
         .memo-item.editing .btn-delete { display: block; }
 
-        /* 入力コンテナ */
         .input-container {
             position: fixed; bottom: 0; left: 0; right: 0;
             background: #f8f8f8; padding: 12px;
@@ -243,7 +140,6 @@
             padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;
         }
 
-        /* モーダル */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; }
         .modal-content { background: white; width: 90%; max-width: 340px; border-radius: 12px; padding: 25px; text-align: center; }
         .modal-btn { width: 100%; margin-bottom: 12px; padding: 14px; border-radius: 8px; border: 1px solid #ccc; cursor: pointer; background: white; font-weight: bold; }
@@ -253,7 +149,7 @@
 
 <div class="fixed-top" id="headerArea">
     <div class="header-main">
-        <h1 class="app-title" id="displayTitle">カテゴリ 1</h1>
+        <h1 class="app-title" id="displayTitle">シンプル記憶</h1>
         <div class="header-icons">
             <button class="icon-btn" onclick="toggleSortMode()" title="順序変更"><i class="fa-solid fa-arrow-right-arrow-left" style="transform: rotate(90deg);"></i></button>
             <button class="icon-btn" onclick="openModal('dataModal')" title="データ管理"><i class="fa-solid fa-floppy-disk"></i></button>
@@ -535,8 +431,19 @@
         const all = { version: "v12-util", tabs: tabNames, contents: {} };
         for(let i=0; i<6; i++) all.contents[`tab_${i}`] = Utils.getStorage(`memos-v12-t${i}`, []);
         const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'text/plain;charset=utf-8' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); 
-        a.download = `backup_memo.txt`; a.click();
+        
+        // ファイル名の生成: 月.日_時分_シンプル記憶.txt
+        const now = new Date();
+        const month = now.getMonth() + 1;
+        const date = now.getDate();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const fileName = `${month}.${date}_${hours}${minutes}_シンプル記憶.txt`;
+
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(blob); 
+        a.download = fileName; 
+        a.click();
     }
 
     function triggerImport() { closeModal('dataModal'); document.getElementById('importPicker').click(); }
