@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シンプル記憶</title>
+    <title>シンプル記憶 2</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -11,7 +11,8 @@
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         :root {
-            --primary-color: #A3D8FF; 
+            /* 見分けやすいようにテーマカラーを緑系に変更しました */
+            --primary-color: #A8FFC1; 
             --tab-1: #FFE4E6; --tab-2: #FFF1E0; --tab-3: #FEFFD6;
             --tab-4: #E6FFED; --tab-5: #E8F4FF; --tab-6: #F3E8FF;
         }
@@ -35,6 +36,8 @@
             background: rgba(255, 255, 255, 0.98); 
             z-index: 1000; border-bottom: 1px solid #ccc;
             width: 100%;
+            /* ヘッダー下部に識別用のラインを追加 */
+            border-bottom: 3px solid var(--primary-color);
         }
         
         .header-main {
@@ -136,7 +139,9 @@
             font-size: 16px; outline: none; resize: none; max-height: 150px; background: #fff;
         }
         .add-btn { 
-            background: #007bff; color: white; border: none; 
+            /* ボタンの色もテーマカラーに合わせて調整 */
+            background: #28a745; 
+            color: white; border: none; 
             padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;
         }
 
@@ -149,7 +154,7 @@
 
 <div class="fixed-top" id="headerArea">
     <div class="header-main">
-        <h1 class="app-title" id="displayTitle">シンプル記憶</h1>
+        <h1 class="app-title" id="displayTitle">シンプル記憶 2</h1>
         <div class="header-icons">
             <button class="icon-btn" onclick="toggleSortMode()" title="順序変更"><i class="fa-solid fa-arrow-right-arrow-left" style="transform: rotate(90deg);"></i></button>
             <button class="icon-btn" onclick="openModal('dataModal')" title="データ管理"><i class="fa-solid fa-floppy-disk"></i></button>
@@ -198,6 +203,9 @@
     let tabNames = [];
     let draggedElement = null;
 
+    // ★重要: ここで保存キーを変更して、別のアプリとしてデータを分離しています
+    const STORAGE_VERSION_KEY = 'app2'; // ここを 'v12' から 'app2' に変更
+
     const Utils = {
         getStorage(key, def) { 
             try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch(e) { return def; } 
@@ -211,7 +219,8 @@
     };
 
     function init() {
-        tabNames = Utils.getStorage('tab-names-v12', ["カテゴリ 1", "カテゴリ 2", "カテゴリ 3", "カテゴリ 4", "カテゴリ 5", "カテゴリ 6"]);
+        // キー名を app2 に変更
+        tabNames = Utils.getStorage(`tab-names-${STORAGE_VERSION_KEY}`, ["カテゴリ 1", "カテゴリ 2", "カテゴリ 3", "カテゴリ 4", "カテゴリ 5", "カテゴリ 6"]);
         renderTabs();
         loadMemos();
         applyBgImage();
@@ -255,8 +264,9 @@
     }
 
     function applyBgImage() {
-        const d = Utils.getStorage(`bg-v12-t${currentTabIndex}`, null);
-        const offset = localStorage.getItem(`off-v12-t${currentTabIndex}`) || "0";
+        // キー名を app2 に変更
+        const d = Utils.getStorage(`bg-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, null);
+        const offset = localStorage.getItem(`off-${STORAGE_VERSION_KEY}-t${currentTabIndex}`) || "0";
         const b = document.body.style;
         if (d) {
             b.backgroundImage = `url("${d}")`;
@@ -273,7 +283,8 @@
         const list = document.getElementById('memoList'); 
         if (!list) return;
         list.innerHTML = '';
-        const data = Utils.getStorage(`memos-v12-t${currentTabIndex}`, []);
+        // キー名を app2 に変更
+        const data = Utils.getStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, []);
         
         if (!data.length) { 
             list.innerHTML = `<div style="text-align:center; padding:100px 20px; color:#999; font-size:15px; background:rgba(255,255,255,0.3);">データがありません</div>`; 
@@ -310,9 +321,10 @@
         const input = document.getElementById('memoInput');
         const text = input.value.trim();
         if (!text) return;
-        const data = Utils.getStorage(`memos-v12-t${currentTabIndex}`, []);
+        // キー名を app2 に変更
+        const data = Utils.getStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, []);
         data.unshift({ id: Utils.genId(), text, date: Utils.formatDate(new Date()) });
-        if (Utils.setStorage(`memos-v12-t${currentTabIndex}`, data)) { 
+        if (Utils.setStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, data)) { 
             input.value = ''; input.style.height = 'auto'; 
             loadMemos(); 
         }
@@ -332,11 +344,12 @@
             el.classList.remove('editing');
             body.contentEditable = false;
             btn.textContent = "編集";
-            const data = Utils.getStorage(`memos-v12-t${currentTabIndex}`, []);
+            // キー名を app2 に変更
+            const data = Utils.getStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, []);
             const m = data.find(x => String(x.id) === String(id));
             if (m) {
                 m.text = body.innerText.trim();
-                Utils.setStorage(`memos-v12-t${currentTabIndex}`, data);
+                Utils.setStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, data);
             }
             loadMemos();
         }
@@ -344,13 +357,15 @@
 
     function deleteMemo(id) {
         if (!confirm('本当に削除しますか？')) return;
-        let data = Utils.getStorage(`memos-v12-t${currentTabIndex}`, []);
+        // キー名を app2 に変更
+        let data = Utils.getStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, []);
         data = data.filter(m => String(m.id) !== String(id));
-        Utils.setStorage(`memos-v12-t${currentTabIndex}`, data); loadMemos();
+        Utils.setStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, data); loadMemos();
     }
 
     function copyText(id) {
-        const data = Utils.getStorage(`memos-v12-t${currentTabIndex}`, []);
+        // キー名を app2 に変更
+        const data = Utils.getStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, []);
         const m = data.find(x => String(x.id) === String(id));
         if (m) {
             navigator.clipboard.writeText(m.text).then(() => { 
@@ -365,9 +380,10 @@
     
     function saveOrder() {
         const ids = [...document.querySelectorAll('.memo-item')].map(el => el.id.replace('m-',''));
-        const old = Utils.getStorage(`memos-v12-t${currentTabIndex}`, []);
+        // キー名を app2 に変更
+        const old = Utils.getStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, []);
         const sorted = ids.map(id => old.find(m => String(m.id) === String(id))).filter(Boolean);
-        Utils.setStorage(`memos-v12-t${currentTabIndex}`, sorted);
+        Utils.setStorage(`memos-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, sorted);
     }
 
     function renderTabs() {
@@ -385,7 +401,8 @@
 
     function renameTab(i) {
         const n = prompt("名前を変更:", tabNames[i]);
-        if (n && n.trim()) { tabNames[i] = n.trim(); Utils.setStorage('tab-names-v12', tabNames); renderTabs(); }
+        // キー名を app2 に変更
+        if (n && n.trim()) { tabNames[i] = n.trim(); Utils.setStorage(`tab-names-${STORAGE_VERSION_KEY}`, tabNames); renderTabs(); }
     }
 
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
@@ -406,7 +423,8 @@
                 canvas.width = w; canvas.height = h;
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
                 const compressed = canvas.toDataURL('image/jpeg', 0.6);
-                if (Utils.setStorage(`bg-v12-t${currentTabIndex}`, compressed)) { applyBgImage(); }
+                // キー名を app2 に変更
+                if (Utils.setStorage(`bg-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, compressed)) { applyBgImage(); }
             };
             img.src = ev.target.result;
         };
@@ -414,31 +432,35 @@
     }
 
     function adjustBgOffset() {
-        const current = localStorage.getItem(`off-v12-t${currentTabIndex}`) || "0";
+        // キー名を app2 に変更
+        const current = localStorage.getItem(`off-${STORAGE_VERSION_KEY}-t${currentTabIndex}`) || "0";
         const val = prompt("位置調整 (px):", current);
-        if (val !== null && !isNaN(val)) { localStorage.setItem(`off-v12-t${currentTabIndex}`, val); applyBgImage(); }
+        if (val !== null && !isNaN(val)) { localStorage.setItem(`off-${STORAGE_VERSION_KEY}-t${currentTabIndex}`, val); applyBgImage(); }
     }
 
     function clearBg() {
         if (confirm("背景を削除しますか？")) {
-            localStorage.removeItem(`bg-v12-t${currentTabIndex}`);
-            localStorage.removeItem(`off-v12-t${currentTabIndex}`);
+            // キー名を app2 に変更
+            localStorage.removeItem(`bg-${STORAGE_VERSION_KEY}-t${currentTabIndex}`);
+            localStorage.removeItem(`off-${STORAGE_VERSION_KEY}-t${currentTabIndex}`);
             applyBgImage(); closeModal('bgModal');
         }
     }
 
     function exportData() {
-        const all = { version: "v12-util", tabs: tabNames, contents: {} };
-        for(let i=0; i<6; i++) all.contents[`tab_${i}`] = Utils.getStorage(`memos-v12-t${i}`, []);
+        // バージョン情報も変更
+        const all = { version: `${STORAGE_VERSION_KEY}-util`, tabs: tabNames, contents: {} };
+        // キー名を app2 に変更
+        for(let i=0; i<6; i++) all.contents[`tab_${i}`] = Utils.getStorage(`memos-${STORAGE_VERSION_KEY}-t${i}`, []);
         const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'text/plain;charset=utf-8' });
         
-        // ファイル名の生成: 月.日_時分_シンプル記憶.txt
         const now = new Date();
         const month = now.getMonth() + 1;
         const date = now.getDate();
         const hours = String(now.getHours()).padStart(2, '0');
         const minutes = String(now.getMinutes()).padStart(2, '0');
-        const fileName = `${month}.${date}_${hours}${minutes}_シンプル記憶.txt`;
+        // ファイル名も変更
+        const fileName = `${month}.${date}_${hours}${minutes}_シンプル記憶2.txt`;
 
         const a = document.createElement('a'); 
         a.href = URL.createObjectURL(blob); 
@@ -455,8 +477,9 @@
             try {
                 const d = JSON.parse(ev.target.result);
                 if (confirm("復元しますか？")) {
-                    Utils.setStorage('tab-names-v12', d.tabs || tabNames);
-                    for(let i=0; i<6; i++) Utils.setStorage(`memos-v12-t${i}`, d.contents ? d.contents[`tab_${i}`] : []);
+                    // キー名を app2 に変更
+                    Utils.setStorage(`tab-names-${STORAGE_VERSION_KEY}`, d.tabs || tabNames);
+                    for(let i=0; i<6; i++) Utils.setStorage(`memos-${STORAGE_VERSION_KEY}-t${i}`, d.contents ? d.contents[`tab_${i}`] : []);
                     location.reload();
                 }
             } catch(e) { alert("不正なファイルです。"); }

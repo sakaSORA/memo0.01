@@ -1,12 +1,12 @@
 {
-  "name": "シンプル記憶",
-  "short_name": "シンプル記憶",
-  "description": "実用性重視のカテゴリ別シンプルメモ帳",
+  "name": "シンプル記憶 2",
+  "short_name": "シンプル記憶 2",
+  "description": "実用性重視のカテゴリ別シンプルメモ帳 (Sub)",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#A3D8FF",
+  "theme_color": "#A8FFC1",
   "icons": [
     {
       "src": "icon-192.png",
