@@ -1,5 +1,5 @@
 // バージョンを変更してキャッシュをリセット
-const CACHE_NAME = 'simple-memo-v3-stable';
+const CACHE_NAME = 'simple-memo-v3.11-stable';
 
 const ASSETS_TO_CACHE = [
   './',
