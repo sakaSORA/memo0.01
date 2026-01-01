@@ -1,52 +1,48 @@
-const CACHE_NAME = 'kioku-v17'; // バージョンを更新して新しい設定を反映
-const urlsToCache = [
+// キャッシュの名前（更新時はここを v3, v4 と上げてください）
+const CACHE_NAME = 'simple-memo-v2-cache';
+
+// キャッシュするファイルの一覧
+const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
+  // アイコンがある場合はここに追加（例: './icon-192.png'）
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
-// インストール処理
+// インストールイベント：ファイルをキャッシュに登録
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Opened cache');
-      return cache.addAll(urlsToCache);
+      return cache.addAll(ASSETS_TO_CACHE);
     })
   );
+  // 新しいサービスワーカーを即座に有効化
+  self.skipWaiting();
 });
 
-// アクティベート時の処理（古いキャッシュを削除）
+// アクティベートイベント：古いキャッシュを削除
 self.addEventListener('activate', (event) => {
-  const cacheWhitelist = [CACHE_NAME];
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            return caches.delete(cache);
           }
         })
       );
-    }).then(() => {
-      return self.clients.claim();
     })
   );
+  return self.clients.claim();
 });
 
-// リソース取得時の戦略（ネットワーク優先 -> 失敗したらキャッシュ）
+// フェッチイベント：ネットワークよりキャッシュを優先（オフライン対応）
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request);
-      })
+    caches.match(event.request).then((response) => {
+      // キャッシュがあればそれを返す、なければネットワークへ
+      return response || fetch(event.request);
+    })
   );
 });
