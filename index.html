@@ -3,30 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>シンプル記憶 2 (PWA/IndexedDB版)</title>
+    <title>シンプル記憶 2 (Stabilized Background)</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* 基本リセットとボックス計算の固定 */
+        /* 基本リセット */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         :root {
             --primary-color: #A8FFC1; 
             --tab-1: #FFE4E6; --tab-2: #FFF1E0; --tab-3: #FEFFD6;
             --tab-4: #E6FFED; --tab-5: #E8F4FF; --tab-6: #F3E8FF;
+            --tab-7: #F0F0F0; --tab-8: #E0FFE0; --tab-9: #FFF0E0;
         }
 
         html, body { height: 100%; margin: 0; padding: 0; width: 100%; }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background-color: #f5f5f5;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* 【重要】背景のブレ・拡大縮小を防止する固定レイヤー */
+        #bgLayer {
+            position: fixed;
+            top: -5%; /* 上下にバッファを持たせて隙間を防止 */
+            left: 0;
+            width: 100%;
+            height: 110%; /* アドレスバー変動をカバーするため少し大きく */
+            z-index: -1;
             background-repeat: no-repeat;
             background-position: center;
             background-size: cover;
-            background-attachment: fixed;
-            overflow-x: hidden;
-            min-height: 100vh;
+            pointer-events: none;
+            /* ハードウェア加速でカクつきを抑える */
+            transform: translateZ(0);
+            -webkit-transform: translateZ(0);
+            will-change: transform;
         }
 
         /* 固定ヘッダー */
@@ -34,7 +49,6 @@
             position: fixed; top: 0; left: 0; right: 0;
             background: rgba(255, 255, 255, 0.98); 
             z-index: 1000; border-bottom: 3px solid var(--primary-color);
-            width: 100%;
         }
         
         .header-main {
@@ -50,30 +64,27 @@
             font-size: 18px; color: #444; cursor: pointer;
         }
 
-        /* タブエリア */
+        /* 9タブグリッド */
         .tab-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px 8px 8px; }
         .tab {
-            padding: 12px 2px; border-radius: 6px; font-size: 0.85rem; 
+            padding: 8px 2px; border-radius: 6px; font-size: 0.8rem; 
             border: 1px solid #ccc; text-align: center; font-weight: bold;
             display: flex; align-items: center; justify-content: center;
-            background: #fff;
+            background: #fff; min-height: 34px;
         }
-        .tab:nth-child(1) { background: var(--tab-1); }
-        .tab:nth-child(2) { background: var(--tab-2); }
-        .tab:nth-child(3) { background: var(--tab-3); }
-        .tab:nth-child(4) { background: var(--tab-4); }
-        .tab:nth-child(5) { background: var(--tab-5); }
-        .tab:nth-child(6) { background: var(--tab-6); }
+        .tab:nth-child(1) { background: var(--tab-1); } .tab:nth-child(2) { background: var(--tab-2); }
+        .tab:nth-child(3) { background: var(--tab-3); } .tab:nth-child(4) { background: var(--tab-4); }
+        .tab:nth-child(5) { background: var(--tab-5); } .tab:nth-child(6) { background: var(--tab-6); }
+        .tab:nth-child(7) { background: var(--tab-7); } .tab:nth-child(8) { background: var(--tab-8); }
+        .tab:nth-child(9) { background: var(--tab-9); }
         .tab.active { border: 2px solid #333; filter: brightness(0.9); }
 
-        /* 検索バー */
         .search-container { padding: 0 8px 8px; }
         #searchInput { 
             width: 100%; padding: 10px 12px; border-radius: 6px; font-size: 15px;
             border: 1px solid #bbb; outline: none; background: #fff;
         }
 
-        /* リストエリア */
         #memoList { padding-bottom: 140px; width: 100%; }
         
         .memo-item {
@@ -81,64 +92,39 @@
             margin: 0; padding: 8px 10px;
             border-bottom: 1px solid rgba(0,0,0,0.1);
             background: rgba(255, 255, 255, 0.9);
-            min-height: 54px; 
-            width: 100%;
+            min-height: 54px; width: 100%;
         }
         .memo-item:nth-child(even) { background: rgba(248, 248, 248, 0.9); }
 
         .drag-handle { cursor: grab; color: #999; font-size: 20px; display: none; padding-right: 12px; }
         .memo-item.sort-mode .drag-handle { display: block; }
+        .memo-item.dragging { opacity: 0.5; }
 
-        .date-text { 
-            font-size: 0.7rem; color: #777; 
-            min-width: 75px; flex-shrink: 0; font-family: monospace;
-        }
-        
+        .date-text { font-size: 0.7rem; color: #777; min-width: 75px; flex-shrink: 0; font-family: monospace; }
         .memo-body { 
             flex: 1; font-size: 0.95rem; color: #111; 
-            margin: 0 10px;
-            white-space: pre-wrap; 
-            word-break: break-all;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            margin: 0 10px; white-space: pre-wrap; word-break: break-all;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
         }
 
+        /* 編集・削除機能の復元スタイル */
         .memo-item.editing { flex-wrap: wrap; background: #fffde7 !important; padding: 15px; }
         .memo-item.editing .memo-body { 
-            display: block; 
-            -webkit-line-clamp: unset;
-            white-space: pre-wrap; 
-            flex-basis: 100%; margin: 10px 0; padding: 12px;
+            display: block; -webkit-line-clamp: unset; flex-basis: 100%; margin: 10px 0; padding: 12px;
             background: #fff; border: 2px solid #007bff; border-radius: 6px;
             max-height: 350px; overflow-y: auto; outline: none;
         }
-
         .memo-controls { display: flex; gap: 6px; flex-shrink: 0; }
-        .action-btn { 
-            border: 1px solid #ccc; background: #fff; 
-            font-size: 0.8rem; font-weight: bold;
-            padding: 8px 12px; border-radius: 6px; color: #333;
-        }
-        
+        .action-btn { border: 1px solid #ccc; background: #fff; font-size: 0.8rem; font-weight: bold; padding: 8px 12px; border-radius: 6px; }
         .btn-delete { color: #d00; border-color: #faa; background: #fff0f0; display: none; }
         .memo-item.editing .btn-delete { display: block; }
 
         .input-container {
             position: fixed; bottom: 0; left: 0; right: 0;
-            background: #f8f8f8; padding: 12px;
-            display: flex; gap: 10px; border-top: 1px solid #bbb; z-index: 1000;
+            background: #f8f8f8; padding: 12px; display: flex; gap: 10px; border-top: 1px solid #bbb; z-index: 1000;
         }
-        #memoInput { 
-            flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc;
-            font-size: 16px; outline: none; resize: none; max-height: 150px; background: #fff;
-        }
-        .add-btn { 
-            background: #28a745; 
-            color: white; border: none; 
-            padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px;
-        }
+        #memoInput { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; outline: none; resize: none; max-height: 150px; }
+        .add-btn { background: #28a745; color: white; border: none; padding: 0 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 2000; align-items: center; justify-content: center; }
         .modal-content { background: white; width: 90%; max-width: 340px; border-radius: 12px; padding: 25px; text-align: center; }
@@ -147,19 +133,19 @@
 </head>
 <body>
 
+<div id="bgLayer"></div>
+
 <div class="fixed-top" id="headerArea">
     <div class="header-main">
-        <h1 class="app-title" id="displayTitle">シンプル記憶 2</h1>
+        <h1 class="app-title" id="displayTitle">読み込み中...</h1>
         <div class="header-icons">
-            <button class="icon-btn" onclick="toggleSortMode()" title="順序変更"><i class="fa-solid fa-arrow-right-arrow-left" style="transform: rotate(90deg);"></i></button>
-            <button class="icon-btn" onclick="openModal('dataModal')" title="データ管理"><i class="fa-solid fa-floppy-disk"></i></button>
-            <button class="icon-btn" onclick="openModal('bgModal')" title="背景管理"><i class="fa-regular fa-image"></i></button>
+            <button class="icon-btn" onclick="toggleSortMode()"><i class="fa-solid fa-arrow-right-arrow-left" style="transform: rotate(90deg);"></i></button>
+            <button class="icon-btn" onclick="openModal('dataModal')"><i class="fa-solid fa-floppy-disk"></i></button>
+            <button class="icon-btn" onclick="openModal('bgModal')"><i class="fa-regular fa-image"></i></button>
         </div>
     </div>
     <div class="tab-grid" id="tabList"></div>
-    <div class="search-container">
-        <input type="text" id="searchInput" placeholder="検索ワードを入力...">
-    </div>
+    <div class="search-container"><input type="text" id="searchInput" placeholder="検索ワードを入力..."></div>
 </div>
 
 <div id="memoList"></div>
@@ -169,115 +155,68 @@
     <button class="add-btn" onclick="addMemo()">追加</button>
 </div>
 
-<div id="bgModal" class="modal">
-    <div class="modal-content">
-        <h3>背景設定</h3>
-        <button class="modal-btn" onclick="triggerBgPicker()">画像を選択</button>
-        <button class="modal-btn" onclick="adjustBgOffset()">上下位置を微調整</button>
-        <button class="modal-btn" onclick="clearBg()">背景を削除</button>
-        <button class="modal-btn" style="background:#eee" onclick="closeModal('bgModal')">閉じる</button>
-    </div>
-</div>
-
-<div id="dataModal" class="modal">
-    <div class="modal-content">
-        <h3>データ管理</h3>
-        <button class="modal-btn" onclick="exportData()">バックアップ (TXT)</button>
-        <button class="modal-btn" onclick="triggerImport()">データを復元</button>
-        <button class="modal-btn" style="background:#eee" onclick="closeModal('dataModal')">閉じる</button>
-    </div>
-</div>
+<div id="bgModal" class="modal"><div class="modal-content"><h3>背景設定</h3><button class="modal-btn" onclick="triggerBgPicker()">画像を選択</button><button class="modal-btn" onclick="adjustBgOffset()">上下位置を微調整</button><button class="modal-btn" onclick="clearBg()">背景を削除</button><button class="modal-btn" style="background:#eee" onclick="closeModal('bgModal')">閉じる</button></div></div>
+<div id="dataModal" class="modal"><div class="modal-content"><h3>データ管理</h3><button class="modal-btn" onclick="exportData()">バックアップ</button><button class="modal-btn" onclick="triggerImport()">データ復元</button><button class="modal-btn" style="background:#eee" onclick="closeModal('dataModal')">閉じる</button></div></div>
 
 <input type="file" id="bgPicker" accept="image/*" style="display:none">
 <input type="file" id="importPicker" accept=".txt,.json" style="display:none">
 
 <script>
     'use strict';
-    let currentTabIndex = 0;
-    let isSortMode = false;
-    let tabNames = [];
-    let draggedElement = null;
+    let currentTabIndex = 0, isSortMode = false, tabNames = [], draggedElement = null, db;
+    const DB_NAME = 'SimpleMemoDB_App2', DB_VERSION = 1;
 
-    // --- IndexedDB 管理 ---
-    const DB_NAME = 'SimpleMemoDB_App2';
-    const DB_VERSION = 1;
-    let db;
-
+    // --- IndexedDB 管理 (機能を損なわず容量を拡大) ---
     const DB = {
         open() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open(DB_NAME, DB_VERSION);
                 request.onupgradeneeded = (e) => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
-                    if (!db.objectStoreNames.contains('memos')) db.createObjectStore('memos');
-                    if (!db.objectStoreNames.contains('backgrounds')) db.createObjectStore('backgrounds');
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings');
+                    if (!d.objectStoreNames.contains('memos')) d.createObjectStore('memos');
+                    if (!d.objectStoreNames.contains('backgrounds')) d.createObjectStore('backgrounds');
                 };
                 request.onsuccess = (e) => { db = e.target.result; resolve(); };
                 request.onerror = (e) => reject(e);
             });
         },
-        get(storeName, key, def) {
-            return new Promise((resolve) => {
-                const tx = db.transaction(storeName, 'readonly');
-                const request = tx.objectStore(storeName).get(key);
-                request.onsuccess = () => resolve(request.result !== undefined ? request.result : def);
-                request.onerror = () => resolve(def);
-            });
-        },
-        set(storeName, key, val) {
-            return new Promise((resolve, reject) => {
-                const tx = db.transaction(storeName, 'readwrite');
-                const request = tx.objectStore(storeName).put(val, key);
-                request.onsuccess = () => resolve(true);
-                request.onerror = (e) => reject(e);
-            });
-        },
-        delete(storeName, key) {
-            return new Promise((resolve) => {
-                const tx = db.transaction(storeName, 'readwrite');
-                const request = tx.objectStore(storeName).delete(key);
-                request.onsuccess = () => resolve(true);
-            });
-        }
+        get: (s, k, d) => new Promise(res => {
+            const tx = db.transaction(s, 'readonly');
+            const req = tx.objectStore(s).get(k);
+            req.onsuccess = () => res(req.result !== undefined ? req.result : d);
+            req.onerror = () => res(d);
+        }),
+        set: (s, k, v) => new Promise(res => {
+            const tx = db.transaction(s, 'readwrite');
+            tx.objectStore(s).put(v, k).onsuccess = () => res(true);
+        }),
+        delete: (s, k) => new Promise(res => {
+            const tx = db.transaction(s, 'readwrite');
+            tx.objectStore(s).delete(k).onsuccess = () => res(true);
+        })
     };
 
     const Utils = {
-        formatDate(d) { return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; },
-        genId() { return Date.now() + Math.random().toString(36).substr(2, 6); }
+        formatDate: (d) => `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+        genId: () => Date.now() + Math.random().toString(36).substr(2, 6)
     };
 
     async function init() {
-        // Service Worker の登録
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('SW registered'))
-                    .catch(err => console.log('SW registration failed'));
-            });
-        }
-
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
         await DB.open();
-        tabNames = await DB.get('settings', 'tabNames', ["カテゴリ 1", "カテゴリ 2", "カテゴリ 3", "カテゴリ 4", "カテゴリ 5", "カテゴリ 6"]);
-        
-        renderTabs();
-        await loadMemos();
-        await applyBgImage();
-        setupEvents();
-        setTimeout(adjustLayout, 300);
+        let stored = await DB.get('settings', 'tabNames', []);
+        const defaults = ["カテゴリ 1", "カテゴリ 2", "カテゴリ 3", "カテゴリ 4", "カテゴリ 5", "カテゴリ 6", "カテゴリ 7", "カテゴリ 8", "カテゴリ 9"];
+        tabNames = (stored.length < 9) ? stored.concat(defaults.slice(stored.length)) : stored;
+        if (stored.length < 9) await DB.set('settings', 'tabNames', tabNames);
+        renderTabs(); await loadMemos(); await applyBgImage(); setupEvents(); setTimeout(adjustLayout, 300);
     }
 
     function setupEvents() {
         document.getElementById('bgPicker').onchange = handleBgSelect;
         document.getElementById('importPicker').onchange = handleFileImport;
-        
         const input = document.getElementById('memoInput');
-        input.oninput = function() { 
-            this.style.height = 'auto'; 
-            this.style.height = Math.min(this.scrollHeight, 150) + 'px';
-            adjustLayout();
-        };
-        
+        input.oninput = function() { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 150) + 'px'; adjustLayout(); };
         const list = document.getElementById('memoList');
         list.addEventListener('dragover', e => {
             if (!isSortMode) return;
@@ -285,68 +224,48 @@
             const after = [...list.querySelectorAll('.memo-item:not(.dragging)')].find(s => e.clientY < s.getBoundingClientRect().top + s.offsetHeight/2);
             list.insertBefore(draggedElement, after);
         });
-
         document.getElementById('searchInput').oninput = filterMemos;
         window.addEventListener('resize', adjustLayout);
     }
 
     function adjustLayout() {
-        const header = document.getElementById('headerArea');
-        const list = document.getElementById('memoList');
-        const inputArea = document.getElementById('inputArea');
+        const header = document.getElementById('headerArea'), list = document.getElementById('memoList'), input = document.getElementById('inputArea');
         if (header && list) {
             list.style.marginTop = header.offsetHeight + 'px';
-            if (inputArea) {
-                list.style.paddingBottom = (inputArea.offsetHeight + 60) + 'px';
-            }
+            if (input) list.style.paddingBottom = (input.offsetHeight + 60) + 'px';
         }
     }
 
     async function applyBgImage() {
         const d = await DB.get('backgrounds', `bg-t${currentTabIndex}`, null);
-        const offset = await DB.get('settings', `off-t${currentTabIndex}`, "0");
-        const b = document.body.style;
-        if (d) {
-            b.backgroundImage = `url("${d}")`;
-            b.backgroundPosition = `center calc(50% + ${offset}px)`;
-            b.backgroundSize = "cover";
-            b.backgroundAttachment = "fixed";
-        } else {
-            b.backgroundImage = "none";
-            b.backgroundColor = "#f5f5f5";
-        }
+        const o = await DB.get('settings', `off-t${currentTabIndex}`, "0");
+        const layer = document.getElementById('bgLayer');
+        layer.style.backgroundImage = d ? `url("${d}")` : "none";
+        layer.style.backgroundPosition = `center calc(50% + ${o}px)`;
     }
 
     async function loadMemos() {
-        const list = document.getElementById('memoList'); 
-        if (!list) return;
-        list.innerHTML = '';
+        const list = document.getElementById('memoList'); list.innerHTML = '';
         const data = await DB.get('memos', `t${currentTabIndex}`, []);
-        
-        if (!data.length) { 
-            list.innerHTML = `<div style="text-align:center; padding:100px 20px; color:#999; font-size:15px; background:rgba(255,255,255,0.3);">データがありません</div>`; 
-            return; 
-        }
-        data.forEach(m => renderMemo(m, list));
+        if (!data.length) { list.innerHTML = `<div style="text-align:center; padding:100px 20px; color:#999;">データがありません</div>`; }
+        else { data.forEach(m => renderMemo(m, list)); }
         adjustLayout();
     }
 
+    // --- メモ表示機能の完全復元 ---
     function renderMemo(m, targetList) {
         const div = document.createElement('div');
         div.className = `memo-item ${isSortMode ? 'sort-mode' : ''}`;
         div.id = `m-${m.id}`; div.draggable = isSortMode;
-        
-        const safeText = m.text.replace(/</g,'&lt;');
         div.innerHTML = `
             <div class="drag-handle"><i class="fa-solid fa-bars"></i></div>
             <span class="date-text">${m.date}</span>
-            <div class="memo-body">${safeText}</div>
+            <div class="memo-body">${m.text.replace(/</g,'&lt;')}</div>
             <div class="memo-controls">
                 <button class="action-btn" onclick="copyText('${m.id}')">Copy</button>
                 <button class="action-btn" onclick="toggleEdit('${m.id}')">編集</button>
                 <button class="action-btn btn-delete" onclick="deleteMemo('${m.id}')">削除</button>
             </div>`;
-        
         if (isSortMode) {
             div.ondragstart = () => { draggedElement = div; div.classList.add('dragging'); };
             div.ondragend = async () => { div.classList.remove('dragging'); draggedElement = null; await saveOrder(); };
@@ -355,36 +274,25 @@
     }
 
     async function addMemo() {
-        const input = document.getElementById('memoInput');
-        const text = input.value.trim();
+        const input = document.getElementById('memoInput'), text = input.value.trim();
         if (!text) return;
         const data = await DB.get('memos', `t${currentTabIndex}`, []);
         data.unshift({ id: Utils.genId(), text, date: Utils.formatDate(new Date()) });
         await DB.set('memos', `t${currentTabIndex}`, data);
-        input.value = ''; input.style.height = 'auto'; 
-        await loadMemos(); 
+        input.value = ''; input.style.height = 'auto'; await loadMemos(); 
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // --- 編集・削除・コピー機能の完全復元 ---
     async function toggleEdit(id) {
-        const el = document.getElementById(`m-${id}`);
-        const body = el.querySelector('.memo-body');
-        const btn = el.querySelectorAll('.action-btn')[1];
-        
+        const el = document.getElementById(`m-${id}`), body = el.querySelector('.memo-body'), btn = el.querySelectorAll('.action-btn')[1];
         if (!el.classList.contains('editing')) {
-            el.classList.add('editing');
-            body.contentEditable = true;
-            body.focus();
-            btn.textContent = "完了";
+            el.classList.add('editing'); body.contentEditable = true; body.focus(); btn.textContent = "完了";
         } else {
-            el.classList.remove('editing');
-            body.contentEditable = false;
-            btn.textContent = "編集";
+            el.classList.remove('editing'); body.contentEditable = false; btn.textContent = "編集";
             const data = await DB.get('memos', `t${currentTabIndex}`, []);
             const m = data.find(x => String(x.id) === String(id));
-            if (m) {
-                m.text = body.innerText.trim();
-                await DB.set('memos', `t${currentTabIndex}`, data);
-            }
+            if (m) { m.text = body.innerText.trim(); await DB.set('memos', `t${currentTabIndex}`, data); }
             await loadMemos();
         }
     }
@@ -393,24 +301,19 @@
         if (!confirm('本当に削除しますか？')) return;
         let data = await DB.get('memos', `t${currentTabIndex}`, []);
         data = data.filter(m => String(m.id) !== String(id));
-        await DB.set('memos', `t${currentTabIndex}`, data); 
-        await loadMemos();
+        await DB.set('memos', `t${currentTabIndex}`, data); await loadMemos();
     }
 
-    async function copyText(id) {
-        const data = await DB.get('memos', `t${currentTabIndex}`, []);
-        const m = data.find(x => String(x.id) === String(id));
-        if (m) {
-            navigator.clipboard.writeText(m.text).then(() => { 
-                const btn = document.querySelector(`#m-${id} .action-btn`);
-                const original = btn.textContent; btn.textContent = "OK!";
-                setTimeout(() => btn.textContent = original, 1000);
-            });
-        }
+    function copyText(id) {
+        const text = document.querySelector(`#m-${id} .memo-body`).innerText;
+        navigator.clipboard.writeText(text).then(() => { 
+            const btn = document.querySelector(`#m-${id} .action-btn`);
+            const old = btn.textContent; btn.textContent = "OK!";
+            setTimeout(() => btn.textContent = old, 1000);
+        });
     }
 
     async function toggleSortMode() { isSortMode = !isSortMode; await loadMemos(); }
-    
     async function saveOrder() {
         const ids = [...document.querySelectorAll('.memo-item')].map(el => el.id.replace('m-',''));
         const old = await DB.get('memos', `t${currentTabIndex}`, []);
@@ -424,10 +327,7 @@
             const btn = document.createElement('div');
             btn.className = `tab ${i === currentTabIndex ? 'active' : ''}`; 
             btn.textContent = name;
-            btn.onclick = async () => { 
-                currentTabIndex = i; isSortMode = false; 
-                renderTabs(); await applyBgImage(); await loadMemos(); 
-            };
+            btn.onclick = async () => { currentTabIndex = i; isSortMode = false; renderTabs(); await applyBgImage(); await loadMemos(); window.scrollTo(0, 0); };
             btn.oncontextmenu = (e) => { e.preventDefault(); renameTab(i); };
             list.appendChild(btn);
         });
@@ -436,32 +336,25 @@
 
     async function renameTab(i) {
         const n = prompt("名前を変更:", tabNames[i]);
-        if (n && n.trim()) { 
-            tabNames[i] = n.trim(); 
-            await DB.set('settings', 'tabNames', tabNames); 
-            renderTabs(); 
-        }
+        if (n && n.trim()) { tabNames[i] = n.trim(); await DB.set('settings', 'tabNames', tabNames); renderTabs(); adjustLayout(); }
     }
 
     function openModal(id) { document.getElementById(id).style.display = 'flex'; }
     function closeModal(id) { document.getElementById(id).style.display = 'none'; }
     function triggerBgPicker() { closeModal('bgModal'); document.getElementById('bgPicker').click(); }
 
-    function handleBgSelect(e) {
+    async function handleBgSelect(e) {
         const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
             const img = new Image();
             img.onload = async () => {
                 const canvas = document.createElement('canvas');
-                let w = img.width, h = img.height, max = 1600; 
-                if (w > max || h > max) {
-                    if (w > h) { h = (h * max) / w; w = max; } else { w = (w * max) / h; h = max; }
-                }
+                let w = img.width, h = img.height, max = 1600;
+                if (w > max || h > max) { if (w > h) { h = (h * max) / w; w = max; } else { w = (w * max) / h; h = max; } }
                 canvas.width = w; canvas.height = h;
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                const compressed = canvas.toDataURL('image/jpeg', 0.8);
-                await DB.set('backgrounds', `bg-t${currentTabIndex}`, compressed);
+                await DB.set('backgrounds', `bg-t${currentTabIndex}`, canvas.toDataURL('image/jpeg', 0.8));
                 await applyBgImage();
             };
             img.src = ev.target.result;
@@ -470,63 +363,39 @@
     }
 
     async function adjustBgOffset() {
-        const current = await DB.get('settings', `off-t${currentTabIndex}`, "0");
-        const val = prompt("位置調整 (px):", current);
-        if (val !== null && !isNaN(val)) { 
-            await DB.set('settings', `off-t${currentTabIndex}`, val); 
-            await applyBgImage(); 
-        }
+        const cur = await DB.get('settings', `off-t${currentTabIndex}`, "0");
+        const val = prompt("位置調整 (px):", cur);
+        if (val !== null && !isNaN(val)) { await DB.set('settings', `off-t${currentTabIndex}`, val); await applyBgImage(); }
     }
 
-    async function clearBg() {
-        if (confirm("背景を削除しますか？")) {
-            await DB.delete('backgrounds', `bg-t${currentTabIndex}`);
-            await DB.delete('settings', `off-t${currentTabIndex}`);
-            await applyBgImage(); closeModal('bgModal');
-        }
-    }
+    async function clearBg() { if(confirm("削除？")) { await DB.delete('backgrounds', `bg-t${currentTabIndex}`); await applyBgImage(); closeModal('bgModal'); } }
 
     async function exportData() {
-        const all = { version: "app2-indexeddb", tabs: tabNames, contents: {} };
-        for(let i=0; i<6; i++) {
-            all.contents[`tab_${i}`] = await DB.get('memos', `t${i}`, []);
-        }
-        const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'text/plain;charset=utf-8' });
-        
-        const now = new Date();
-        const fileName = `${now.getMonth()+1}.${now.getDate()}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}_シンプル記憶2_DB.txt`;
-
-        const a = document.createElement('a'); 
-        a.href = URL.createObjectURL(blob); 
-        a.download = fileName; 
-        a.click();
+        const all = { tabs: tabNames, contents: {} };
+        for(let i=0; i<9; i++) all.contents[`tab_${i}`] = await DB.get('memos', `t${i}`, []);
+        const blob = new Blob([JSON.stringify(all)], { type: 'text/plain' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `backup_9tab.txt`; a.click();
     }
 
     function triggerImport() { closeModal('dataModal'); document.getElementById('importPicker').click(); }
-    
     function handleFileImport(e) {
         const f = e.target.files[0]; if (!f) return;
         const r = new FileReader();
         r.onload = async (ev) => {
             try {
                 const d = JSON.parse(ev.target.result);
-                if (confirm("復元しますか？（現在のデータは上書きされます）")) {
-                    await DB.set('settings', 'tabNames', d.tabs || tabNames);
-                    for(let i=0; i<6; i++) {
-                        await DB.set('memos', `t${i}`, d.contents ? d.contents[`tab_${i}`] : []);
-                    }
-                    location.reload();
-                }
-            } catch(e) { alert("不正なファイルです。"); }
+                await DB.set('settings', 'tabNames', d.tabs);
+                for(let i=0; i<9; i++) await DB.set('memos', `t${i}`, d.contents[`tab_${i}`] || []);
+                location.reload();
+            } catch(e) { alert("失敗"); }
         };
-        r.readAsText(f, 'UTF-8');
+        r.readAsText(f);
     }
 
     function filterMemos() {
         const q = document.getElementById('searchInput').value.toLowerCase();
-        document.querySelectorAll('.memo-item').forEach(el => {
-            el.style.display = el.innerText.toLowerCase().includes(q) ? 'flex' : 'none';
-        });
+        document.querySelectorAll('.memo-item').forEach(el => { el.style.display = el.innerText.toLowerCase().includes(q) ? 'flex' : 'none'; });
+        adjustLayout();
     }
 
     init();
